@@ -48,9 +48,9 @@ class BeatTrackingDatamodule(LightningDataModule):
         self.audio_dir = audio_dir
         
     def fetch_ballroom_annotations(self):
-        annotations_path = 'data/ballroom_annotations.csv'
+        annotations_path = 'data/ballroom_annotations.json'
         
-        annotations = pd.read_csv(annotations_path)
+        annotations = pd.read_json(annotations_path)
         
         for root, dirs, files in os.walk(self.audio_dir):
             for file in files:

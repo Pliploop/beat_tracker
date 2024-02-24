@@ -34,22 +34,41 @@ class BeatTrackingDataset(Dataset):
     def __len__(self):
         return len(self.annotations)
     
-    def __getitem__(self, idx):
+    def dummy_call(self):
+        dummy_audio = torch.randn(1, self.target_sr * self.target_seconds)
+        dummy_beats = torch.zeros(self.target_sr * self.target_seconds)
+        dummy_downbeats = torch.zeros(self.target_sr * self.target_seconds)
+        dummy_spectrogram = torch.randn( self.n_mels, self.target_sr * self.target_seconds // self.hop_length)
+        return {
+            'audio': dummy_audio,
+            'spectrogram': dummy_spectrogram,
+            'beats': dummy_beats,
+            'downbeats': dummy_downbeats,
+            'original_sample_rate': self.target_sr,
+            'new_sample_rate': self.target_sr,
+            'fps': self.fps,
+        }
         
-        x = self.annotations.iloc[idx]
+    
+    def __getitem__(self, index):
+        
+        
+        x = self.annotations.iloc[index]
         path = x['file_path']
         beats = x['beats']
         downbeats = x['downbeats']
+        print(beats)
+        print(downbeats)
         
         # load the audio file
         audio,sr = load_audio(path, target_sr = self.target_sr)
         if audio is None:
-            return self[idx+1]
+            return self[index+1]
         
         # convert the audio to a tensor
         audio = torch.tensor(audio, dtype=torch.float32)
     
-        spectrogram = get_spectrogram(audio, target_sr = self.target_sr, hop_length = self.hop_length, n_fft = self.n_fft, n_mels = self.n_mels)
+        spectrogram = get_spectrogram(audio = audio, target_sr = self.target_sr, hop_length = self.hop_length, n_fft = self.n_fft, n_mels = self.n_mels)
         # self.fps frames per second spectrogram.
         
         #beats and downbeats is a list of times in seconds. Convert to binary sequence the size of the spectrogram
@@ -61,9 +80,10 @@ class BeatTrackingDataset(Dataset):
         for downbeat in downbeats:
             downbeat_sequence[int(downbeat * self.fps)] = 1
             
-        # apply a smoothing filter to the beat sequence
-        beat_sequence = np.convolve(beat_sequence, np.ones(5), mode='same')
-        downbeat_sequence = np.convolve(downbeat_sequence, np.ones(5), mode='same')
+        # apply a smoothing filter to the beat sequence with convoltion and a gaussian kernel
+        beat_sequence = np.convolve(beat_sequence, np.array([0.25, 0.5, 1, 0.5, 0.25]), mode='same')
+        downbeat_sequence = np.convolve(downbeat_sequence, np.array([0.25, 0.5, 1, 0.5, 0.25]), mode='same')
+        
         
         # convert to tensor
         beat_sequence = torch.tensor(beat_sequence, dtype=torch.float32)
