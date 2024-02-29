@@ -4,9 +4,10 @@ from madmom.features import DBNBeatTrackingProcessor
 import torch
 from beat_tracker.dataloading.loading_utils import get_spectrogram,load_audio
 import yaml
+import librosa
 
-DEFAULT_CHECKPOINT = 'checkpoints/vague-sun-23/best-epoch=679-val_loss=0.10.ckpt'
-DEFAULT_CONFIG = 'checkpoints/vague-sun-23/config.yaml'
+DEFAULT_CHECKPOINT = 'default_checkpoints/best-epoch=679-val_loss=0.10.ckpt'
+DEFAULT_CONFIG = 'default_checkpoints/config.yaml'
 
 class BeatTracker:
     """
@@ -30,6 +31,10 @@ class BeatTracker:
         hop_length (int): The hop length for audio processing.
         beat_postprocessor (object): The beat post-processing object.
         downbeat_postprocessor (object): The downbeat post-processing object.
+        
+    Example usage:
+        >>> beat_tracker = BeatTracker()
+        >>> beat_times, downbeat_times = beat_tracker('path/to/audio/file')
     """
 
     def __init__(self, checkpoint_path=DEFAULT_CHECKPOINT,
@@ -88,7 +93,7 @@ class BeatTracker:
 
         return new_state_dict
 
-    def __call__(self, path):
+    def __call__(self, path, return_audio = False):
         """
         Process an audio file and return the beat and downbeat times.
 
@@ -108,8 +113,41 @@ class BeatTracker:
         downbeat_times = None
         if self.predict_downbeats:
             downbeat_times = self.downbeat_postprocessor(downbeat_activations.squeeze().cpu().detach().numpy())
-
+        if return_audio:
+            return beat_times, downbeat_times, {
+                "audio": audio,
+                "spectrogram": gram,
+                "sr": self.target_sample_rate
+            }
         return beat_times, downbeat_times
+        
+        
+    def sonify_beats(self, path, beat_times, downbeat_times=None):
+        """
+        Sonify the beat and downbeat times of an audio file.
+
+        Parameters:
+        path (str): The path to the audio file.
+        beat_times (list): A list of beat times in seconds.
+        downbeat_times (list): A list of downbeat times in seconds.
+
+        Returns:
+        numpy.ndarray: The audio with the beat and downbeat sounds added.
+        """
+        
+        beats, downbeats, audio_dic = self(path, return_audio=True)
+        audio = audio_dic["audio"]
+        sr = audio_dic["sr"]
+        gram = audio_dic["spectrogram"]
+        
+        # sonify the beats
+        beat_audio = librosa.clicks(times=beat_times, sr=sr, length=len(audio), click_freq=500, click_duration=0.1)
+        if downbeat_times is not None:
+            downbeat_audio = librosa.clicks(times=downbeat_times, sr=sr, length=len(audio))
+            beat_audio += downbeat_audio
+            
+        return audio + beat_audio
+        
         
         
         

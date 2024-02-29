@@ -1,0 +1,106 @@
+ckpt_path: checkpoints
+data:
+  audio_dirs:
+    ballroom_mel: /import/c4dm-datasets/ballroom/BallroomData
+    gtzan_mel: /import/c4dm-datasets/gtzan_torchaudio
+    hainsworth_mel: /import/c4dm-datasets/hainsworth
+  batch_size: 1
+  fps: 100
+  kfolds: null
+  n_fft: 2048
+  n_mels: 81
+  num_workers: 8
+  target_seconds: 30
+  target_sr: 44100
+  tasks:
+  - ballroom_mel
+  test_split: 0.1
+  transform: false
+  val_split: 0.1
+early_stopping_patience: 100
+log: 'true'
+model:
+  beat_vs_downbeat_loss_ratio: 1
+  fps: 100
+  model:
+    class_path: beat_tracker.models.TCN.BeatTrackingTCN
+    init_args:
+      channels: 16
+      downbeats: true
+      dropout: 0.1
+      kernel_size: 5
+  optimizer:
+    class_path: torch.optim.Adam
+    init_args:
+      amsgrad: false
+      betas:
+      - 0.9
+      - 0.999
+      capturable: false
+      differentiable: false
+      eps: 1.0e-08
+      foreach: null
+      fused: null
+      lr: 0.001
+      maximize: false
+      weight_decay: 0.0
+  scheduler:
+    class_path: torch.optim.lr_scheduler.ReduceLROnPlateau
+    init_args:
+      cooldown: 0
+      eps: 1.0e-08
+      factor: 0.2
+      min_lr: 0.0
+      mode: min
+      monitor: val_loss
+      optimizer: null
+      patience: 50
+      threshold: 0.0001
+      threshold_mode: rel
+      verbose: deprecated
+  threshold: 0.5
+resume_from_checkpoint: null
+resume_id: null
+seed_everything: 123
+test: false
+trainer:
+  accelerator: auto
+  accumulate_grad_batches: 1
+  barebones: false
+  benchmark: null
+  callbacks: null
+  check_val_every_n_epoch: 20
+  default_root_dir: null
+  detect_anomaly: false
+  deterministic: null
+  devices:
+  - 0
+  enable_checkpointing: null
+  enable_model_summary: null
+  enable_progress_bar: null
+  fast_dev_run: false
+  gradient_clip_algorithm: null
+  gradient_clip_val: null
+  inference_mode: true
+  limit_predict_batches: null
+  limit_test_batches: null
+  limit_train_batches: null
+  limit_val_batches: 4
+  log_every_n_steps: null
+  logger: null
+  max_epochs: 1000
+  max_steps: -1
+  max_time: null
+  min_epochs: null
+  min_steps: null
+  num_nodes: 1
+  num_sanity_val_steps: null
+  overfit_batches: 0.0
+  plugins: null
+  precision: null
+  profiler: null
+  reload_dataloaders_every_n_epochs: 0
+  strategy: auto
+  sync_batchnorm: false
+  use_distributed_sampler: true
+  val_check_interval: null
