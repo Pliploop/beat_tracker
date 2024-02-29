@@ -6,6 +6,13 @@ __pycache__/
 # C extensions
 *.so
 
+wandb
+*.ipynb
+# remove ipynb files
+*.ipynb
+checkpoints
+
+
 # Distribution / packaging
 .Python
 build/
