@@ -11,7 +11,7 @@ wandb
 # remove ipynb files
 *.ipynb
 checkpoints
-
+beat_tracker.egg-info
 
 # Distribution / packaging
 .Python
