@@ -7,9 +7,9 @@ __pycache__/
 *.so
 
 wandb
+# remove ipynb files except for beat_tracking_example.ipynb
 *.ipynb
-# remove ipynb files
-*.ipynb
+!beat_tracking_example.ipynb
 checkpoints
 beat_tracker.egg-info
 

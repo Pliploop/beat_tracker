@@ -75,6 +75,7 @@ class BeatTrackingDataset(Dataset):
         path = x['file_path']
         beats = x['beats']
         downbeats = x['downbeats']
+        task = x['task']
 
         # load the audio file
         audio,sr = load_audio(path, target_sr = self.target_sr)
@@ -125,6 +126,7 @@ class BeatTrackingDataset(Dataset):
             'original_sample_rate': sr,
             'new_sample_rate': self.target_sr,
             'fps': self.fps,
+            'task': task
         }
 
 
@@ -159,6 +161,18 @@ class BeatTrackingMelDataset(Dataset):
         self.train = train
         self.augmentations = augmentations
         
+        self.task2idx = {
+            "ballroom_mel": 0,
+            "hainsworth_mel": 1,
+            "gtzan_mel": -1,
+        }
+        
+        self.idx2task = {
+            0: "ballroom_mel",
+            1: "hainsworth_mel",
+            -1: "gtzan_mel",
+        }
+        
         
     def __len__(self):
         return len(self.annotations)
@@ -172,6 +186,7 @@ class BeatTrackingMelDataset(Dataset):
         path = x['file_path']
         beats = x['beats']
         downbeats = x['downbeats']
+        task = x['task']
 
         # load the audio file
         # self.fps frames per second spectrogram.
@@ -188,7 +203,7 @@ class BeatTrackingMelDataset(Dataset):
         #if spectrogram is shorter than target_seconds * fps, pad it with zeros along the last dimension
         trunc= True
         if self.target_seconds is not None:
-            if spectrogram.shape[-1] < self.target_seconds * self.fps :
+            if spectrogram.shape[-1] <= self.target_seconds * self.fps :
                 spectrogram = torch.nn.functional.pad(spectrogram, (0, self.target_seconds * self.fps - spectrogram.shape[-1]))
                 trunc = False
         
@@ -198,9 +213,11 @@ class BeatTrackingMelDataset(Dataset):
         downbeat_sequence = np.zeros(spectrogram.shape[-1])
         
         for beat in beats:
-            beat_sequence[int(beat * self.fps)] = 1
+            if beat * self.fps < spectrogram.shape[-1]: 
+                beat_sequence[int(beat * self.fps)] = 1
         for downbeat in downbeats:
-            downbeat_sequence[int(downbeat * self.fps)] = 1
+            if downbeat * self.fps < spectrogram.shape[-1]:
+                downbeat_sequence[int(downbeat * self.fps)] = 1
             
         # apply a smoothing filter to the beat sequence with convoltion and a gaussian kernel
         beat_sequence = np.convolve(beat_sequence, np.array([0.25, 0.5, 1, 0.5, 0.25]), mode='same')
@@ -230,4 +247,5 @@ class BeatTrackingMelDataset(Dataset):
             'original_sample_rate': sr,
             'new_sample_rate': self.target_sr,
             'fps': self.fps,
+            'task': self.task2idx[task]
         }

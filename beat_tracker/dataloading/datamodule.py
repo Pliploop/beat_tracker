@@ -175,6 +175,51 @@ class BeatTrackingDatamodule(LightningDataModule):
         
         return annotations
     
+    def fetch_gtzan_mel_annotations(self):
+        annotations_path = 'data/gtzan_annotations_mel.json'
+        
+        annotations = pd.read_json(annotations_path)
+        
+        audio_dir = self.audio_dirs['gtzan_mel']
+        
+        for root, dirs, files in os.walk(audio_dir):
+            for file in files:
+                if file.endswith('.npy'):
+                    file_path = os.path.join(root, file)
+                    if file in annotations['file_name'].values:
+                        annotations.loc[annotations['file_name'] == file, 'file_path'] = file_path
+        # select train test and val indices
+        annotations['split'] = 'test'
+        annotations['task'] = 'gtzan_mel'
+        
+        return annotations
+    
+    def fetch_hainsworth_mel_annotations(self):
+        annotations_path = 'data/hainsworth_annotations_mel.json'
+        
+        audio_dir = self.audio_dirs['hainsworth_mel']
+        
+        annotations = pd.read_json(annotations_path)
+        
+        for root, dirs, files in os.walk(audio_dir):
+            for file in files:
+                if file.endswith('.npy'):
+                    file_path = os.path.join(root, file)
+                    if file in annotations['file_name'].values:
+                        annotations.loc[annotations['file_name'] == file, 'file_path'] = file_path
+                        
+        # select train test and val indices
+        annotations['split'] = 'train'
+        annotations = annotations.sample(frac=1).reset_index(drop=True)
+        n = len(annotations)
+        val_idx = int(self.val_split * n)
+        test_idx = int(self.test_split * n)
+        annotations.loc[annotations.index[:val_idx], 'split'] = 'val'
+        annotations.loc[annotations.index[val_idx:val_idx+test_idx], 'split'] = 'test'
+        annotations['task'] = 'hainsworth_mel'
+        
+        return annotations
+    
     def setup(self, stage = None, fold = None):
         # get the split column according to the fold
         if fold is not None:

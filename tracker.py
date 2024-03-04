@@ -46,6 +46,7 @@ class BeatTracker:
 
         self.checkpoint_path = checkpoint_path
         self.model = model_class()
+        self.model.to(self.device)
         self.predict_downbeats = predict_downbeats
 
         # load config as yaml
@@ -57,10 +58,12 @@ class BeatTracker:
         self.fps = self.config['data']['fps']
         self.hop_length = self.target_sample_rate // self.fps
 
-        state_dict = torch.load(self.checkpoint_path, map_location=self.device)
+        state_dict = torch.load(self.checkpoint_path, map_location=self.device)['state_dict']
         if "model." == list(state_dict.keys())[0][:6]:
             new_state_dict = self.process_torch_state_dict(state_dict)
         self.model.load_state_dict(new_state_dict)
+        print("Model loaded")
+        
 
         self.beat_postprocessor = DBNBeatTrackingProcessor(
             min_bpm=55,
@@ -104,6 +107,10 @@ class BeatTracker:
         tuple: A tuple containing the beat times and downbeat times (if available).
         """
         audio, original_sr = load_audio(path, target_sr=self.target_sample_rate)
+        
+        #to mono
+        if audio.shape[1] > 1:
+            audio = audio.mean(axis=-1)
         gram = get_spectrogram(audio, target_sr=self.target_sample_rate, n_mels=self.n_mels,
                                hop_length=self.hop_length, n_fft=2048)
         activations = self.model(gram.unsqueeze(0).to(self.device))['logits']
@@ -111,10 +118,14 @@ class BeatTracker:
         downbeat_activations = activations[0, 1, :]
         beat_times = self.beat_postprocessor(beat_activations.squeeze().cpu().detach().numpy())
         downbeat_times = None
+        beat_activations = torch.sigmoid(beat_activations)
+        downbeat_activations = torch.sigmoid(downbeat_activations)
         if self.predict_downbeats:
             downbeat_times = self.downbeat_postprocessor(downbeat_activations.squeeze().cpu().detach().numpy())
         if return_audio:
             return beat_times, downbeat_times, {
+                "beat_activations": beat_activations,
+                "downbeat_activations": downbeat_activations,
                 "audio": audio,
                 "spectrogram": gram,
                 "sr": self.target_sample_rate
@@ -122,7 +133,7 @@ class BeatTracker:
         return beat_times, downbeat_times
         
         
-    def sonify_beats(self, path, beat_times, downbeat_times=None):
+    def sonify_beats(self, path):
         """
         Sonify the beat and downbeat times of an audio file.
 
@@ -135,18 +146,18 @@ class BeatTracker:
         numpy.ndarray: The audio with the beat and downbeat sounds added.
         """
         
-        beats, downbeats, audio_dic = self(path, return_audio=True)
+        beats, downbeats, beat_activations,downbeat_activations, audio_dic = self(path, return_audio=True)
         audio = audio_dic["audio"]
         sr = audio_dic["sr"]
         gram = audio_dic["spectrogram"]
         
         # sonify the beats
-        beat_audio = librosa.clicks(times=beat_times, sr=sr, length=len(audio), click_freq=500, click_duration=0.1)
-        if downbeat_times is not None:
-            downbeat_audio = librosa.clicks(times=downbeat_times, sr=sr, length=len(audio))
+        beat_audio = librosa.clicks(times=beats, sr=sr, length=len(audio), click_freq=500, click_duration=0.1)
+        if downbeats is not None:
+            downbeat_audio = librosa.clicks(times=downbeats, sr=sr, length=len(audio))
             beat_audio += downbeat_audio
             
-        return audio + beat_audio
+        return audio + beat_audio,sr
         
         
         

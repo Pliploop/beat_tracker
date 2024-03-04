@@ -1,3 +1,7 @@
+"""
+This script trains a BeatTracker model using PyTorch Lightning.
+"""
+
 from beat_tracker.models.beat_tracker import BeatTracker
 from beat_tracker.dataloading.datamodule import BeatTrackingDatamodule
 from pytorch_lightning.cli import LightningCLI
@@ -10,6 +14,17 @@ import os
 
 class LoggerSaveConfigCallback(SaveConfigCallback):
     def save_config(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
+        """
+        Saves the configuration of the experiment.
+
+        Args:
+            trainer (Trainer): The PyTorch Lightning Trainer object.
+            pl_module (LightningModule): The PyTorch Lightning LightningModule object.
+            stage (str): The current stage of training.
+
+        Returns:
+            None
+        """
         if trainer.logger is not None:
             experiment_name = trainer.logger.experiment.name
             # Required for proper reproducibility
@@ -27,6 +42,15 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
 
 class MyLightningCLI(LightningCLI):
     def add_arguments_to_parser(self, parser):
+        """
+        Adds custom arguments to the parser.
+
+        Args:
+            parser (ArgumentParser): The argument parser.
+
+        Returns:
+            None
+        """
         parser.add_argument("--log", default=False)
         parser.add_argument("--ckpt_path", default="checkpoints")
         parser.add_argument("--resume_id", default=None)
@@ -60,12 +84,6 @@ if __name__ == "__main__":
     
     fold = None
     # get the metrics from the fold
-    if fold is not None:
-        val_monitor = f'val_fold_{fold}_loss'
-        train_monitor = f'train_fold_{fold}_loss'
-    else:
-        val_monitor = 'val_loss'
-        train_monitor = 'train_loss'
     
     # initial callbacks
     # two model checkpoints that save the best model based on the validation loss and the best model based on the training loss
@@ -76,7 +94,7 @@ if __name__ == "__main__":
         dirpath=os.path.join(cli.config.ckpt_path, experiment_name),
         filename='best-{epoch:02d}-{val_loss:.2f}',
         save_top_k=1,
-        monitor=val_monitor,
+        monitor='val_loss',
         mode='min'
     )
 
@@ -84,7 +102,7 @@ if __name__ == "__main__":
         dirpath=os.path.join(cli.config.ckpt_path, experiment_name),
         filename='best-{epoch:02d}-{train_loss:.2f}',
         save_top_k=1,
-        monitor=train_monitor,
+        monitor='train_loss',
         mode='min'
     )
 
@@ -94,7 +112,7 @@ if __name__ == "__main__":
             mode='min'
         )
 
-    callbacks = [checkpoint_callback, checkpoint_callback_train]
+    callbacks = [checkpoint_callback, checkpoint_callback_train, early_stopping_callback]
 
 
     cli.trainer.callbacks = cli.trainer.callbacks[:-1]+callbacks
@@ -108,52 +126,65 @@ if __name__ == "__main__":
     
     
     if cli.config.data.kfolds is not None:
-        for fold in range(cli.config.data.kfolds):
-            
-            
-            # reset the callbacks
-            cli.trainer.callbacks = cli.trainer.callbacks[:-2]
-            checkpoint_callback = ModelCheckpoint(
-                dirpath=os.path.join(cli.config.ckpt_path, experiment_name),
-                filename=f'best-{fold}-{{epoch:02d}}-{{val_fold_{fold}_loss:.2f}}',
-                save_top_k=1,
-                monitor=f'val_fold_{fold}_loss',
-                mode='min'
-            )
-            
-            checkpoint_callback_train = ModelCheckpoint(
-                dirpath=os.path.join(cli.config.ckpt_path, experiment_name),
-                filename=f'best-{fold}-{{epoch:02d}}-{{train_fold_{fold}_loss:.2f}}',
-                save_top_k=1,
-                monitor=f'train_fold_{fold}_loss',
-                mode='min'
-            )
-            
-            early_stopping_callback = EarlyStopping(
+        
+        cli.trainer.callbacks = cli.trainer.callbacks[:-2]
+        checkpoint_callback = ModelCheckpoint(
+            dirpath=os.path.join(cli.config.ckpt_path, experiment_name),
+            filename=f'best-{{epoch:02d}}-{{val_fold_loss:.2f}}',
+            save_top_k=1,
+            monitor=f'val_loss',
+            mode='min'
+        )
+        
+        checkpoint_callback_train = ModelCheckpoint(
+            dirpath=os.path.join(cli.config.ckpt_path, experiment_name),
+            filename=f'best-{{epoch:02d}}-{{train_loss:.2f}}',
+            save_top_k=1,
+            monitor=f'train_loss',
+            mode='min'
+        )
+        
+        early_stopping_callback = EarlyStopping(
                 monitor=f'val_fold_{fold}_loss',
                 patience=cli.config.early_stopping_patience,
                 mode='min'
             )
             
-            callbacks = [checkpoint_callback, checkpoint_callback_train]
-            cli.trainer.callbacks = cli.trainer.callbacks+callbacks
+        callbacks = [checkpoint_callback, checkpoint_callback_train, early_stopping_callback]
+        cli.trainer.callbacks = cli.trainer.callbacks+callbacks
+         
+        for fold in range(cli.config.data.kfolds):
+            
+            
+            print(f"Training fold {fold}")
+            
+            new_early_stopping_callback = EarlyStopping(
+                monitor=f'val_fold_{fold}_loss',
+                patience=cli.config.early_stopping_patience,
+                mode='min'
+            )
+            
+            cli.trainer.callbacks = cli.trainer.callbacks[:-1]+[new_early_stopping_callback]        
             
             cli.model.update_fold(fold)
             cli.datamodule.setup(fold=fold)
-            cli.trainer.reset_train_dataloader()
-            cli.trainer.reset_val_dataloader()
-            cli.trainer.reset_test_dataloader()
             
-            cli.trainer.fit(model=cli.model, datamodule=cli.datamodule, ckpt_path=cli.config.resume_from_checkpoint)
-            cli.model.load_weights(checkpoint_callback.best_model_path)
-            cli.trainer.test(model=cli.model, datamodule=cli.datamodule)
-
+            # create a new trainer with the same parameters
+            kwargs = cli.config.trainer
+            new_trainer = Trainer(**kwargs)
+            new_trainer.logger = logger
+            new_trainer.callbacks = cli.trainer.callbacks
+            new_trainer.fit(model=cli.model, datamodule=cli.datamodule)
+            
+            
+            
     else:
         pass
-        if not cli.config.test:
-            cli.trainer.fit(model=cli.model, datamodule=cli.datamodule, ckpt_path=cli.config.resume_from_checkpoint)
-            if logger is not None:
-                    cli.model.load_weights(checkpoint_callback.best_model_path)
-                    
-        cli.trainer.test(model=cli.model, datamodule=cli.datamodule)
+    
+    if not cli.config.test:
+        cli.trainer.fit(model=cli.model, datamodule=cli.datamodule, ckpt_path=cli.config.resume_from_checkpoint)
+        if logger is not None:
+                cli.model.load_weights(checkpoint_callback.best_model_path)
+                
+    cli.trainer.test(model=cli.model, datamodule=cli.datamodule)
     

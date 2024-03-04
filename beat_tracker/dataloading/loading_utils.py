@@ -3,7 +3,7 @@ import torchaudio
 import numpy as np
 import torch
 
-def load_audio(path, target_seconds = None, start = None, target_sr = None):
+def load_audio(path, target_seconds = None, start = None, target_sr = None, mono = True):
         try:
             info = sf.info(path)
             extension = path.split(".")[-1]
@@ -27,8 +27,13 @@ def load_audio(path, target_seconds = None, start = None, target_sr = None):
                 
             audio = torch.tensor(audio, dtype=torch.float32)
             if target_sr is not None:
+                # transpose audio for torchaudio
+                original_len_audio_s = audio.shape[0] / sr
+                audio = audio.t()
                 audio = torchaudio.functional.resample(audio, sr, target_sr)
-            
+                audio = audio.t()
+                new_len_audio_s = audio.shape[0] / target_sr
+                
             if audio.dim() == 1:
                 audio = audio.unsqueeze(0)
                 

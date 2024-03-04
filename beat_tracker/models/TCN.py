@@ -38,9 +38,6 @@ class TCNLayer(nn.Module):
         self.conv2 = weight_norm(self.conv2)
         self.elu2 = nn.ELU()
         self.dropout2 = nn.Dropout(dropout)
-
-        self.downsample = nn.Conv1d(inputs, outputs, 1)\
-            if inputs != outputs else None
         self.elu3 = nn.ELU()
 
     def forward(self, x):
@@ -51,10 +48,6 @@ class TCNLayer(nn.Module):
         y = self.conv2(y)
         y = self.elu2(y)
         y = self.dropout2(y)
-
-        if self.downsample is not None:
-            y = y + self.downsample(x)
-
         y = self.elu3(y)
 
         return y
@@ -102,8 +95,7 @@ class BeatTrackingTCN(nn.Module):
             self,
             channels=16,
             kernel_size=5,
-            dropout=0.1,
-            downbeats=True):
+            dropout=0.1):
         
         super(BeatTrackingTCN, self).__init__()
 
@@ -141,11 +133,9 @@ class BeatTrackingTCN(nn.Module):
             [channels] * 11,
             kernel_size,
             dropout)
-        if downbeats:
-            self.out = nn.Conv1d(channels, 2, 1)
-        else:
-            self.out = nn.Conv1d(channels, 1, 1)
-
+        
+        self.out = nn.Conv1d(channels, 2, 1)
+        
     def forward(self, spec):
         
         # if unbatched, add a batch dimension
