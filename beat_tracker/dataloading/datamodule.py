@@ -220,26 +220,33 @@ class BeatTrackingDatamodule(LightningDataModule):
         
         return annotations
     
-    def setup(self, stage = None, fold = None):
+    def setup(self, stage=None, fold=None):
+        """
+        Set up the data module for training, validation, and testing.
+
+        Args:
+            stage (str, optional): Stage of the data module. Defaults to None.
+            fold (int, optional): Fold number for data splitting. Defaults to None.
+        """
         # get the split column according to the fold
         if fold is not None:
             self.fold = fold
             fold_col = f'split_{fold}'
         else:
             fold_col = 'split'
-        
+
         train_annotations = self.annotations[self.annotations[fold_col] == 'train']
         val_annotations = self.annotations[self.annotations[fold_col] == 'val']
         test_annotations = self.annotations[self.annotations[fold_col] == 'test']
-        
+
         if 'mel' not in self.tasks[0]:
-            self.train_dataset = BeatTrackingDataset(train_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train = True, augmentations = self.augmentations, transform = self.transform)
-            self.val_dataset = BeatTrackingDataset(val_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train = True, augmentations = self.augmentations, transform = self.transform)
-            self.test_dataset = BeatTrackingDataset(test_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train = False, augmentations = None, transform = False)  
+            self.train_dataset = BeatTrackingDataset(train_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train=True, augmentations=self.augmentations, transform=self.transform)
+            self.val_dataset = BeatTrackingDataset(val_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train=True, augmentations=self.augmentations, transform=self.transform)
+            self.test_dataset = BeatTrackingDataset(test_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train=False, augmentations=None, transform=False)
         else:
-            self.train_dataset = BeatTrackingMelDataset(train_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train = True, augmentations = self.augmentations, transform = self.transform)
-            self.val_dataset = BeatTrackingMelDataset(val_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train = True, augmentations = self.augmentations, transform = self.transform)
-            self.test_dataset = BeatTrackingMelDataset(test_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train = False, augmentations = None, transform = False)
+            self.train_dataset = BeatTrackingMelDataset(train_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train=True, augmentations=self.augmentations, transform=self.transform)
+            self.val_dataset = BeatTrackingMelDataset(val_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train=True, augmentations=self.augmentations, transform=self.transform)
+            self.test_dataset = BeatTrackingMelDataset(test_annotations, target_sr=self.target_sr, target_seconds=self.target_seconds, n_fft=self.n_fft, fps=self.fps, n_mels=self.n_mels, train=False, augmentations=None, transform=False)
             
         
     def train_dataloader(self):

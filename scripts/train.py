@@ -35,9 +35,6 @@ class LoggerSaveConfigCallback(SaveConfigCallback):
             with open(os.path.join(os.path.join(self.config['ckpt_path'], experiment_name), "config.yaml"), 'w') as outfile:
                 yaml.dump(config, outfile, default_flow_style=False)
                 
-            #instanciate a ModelCheckpoint saving the model every epoch
-            
-            
 
 
 class MyLightningCLI(LightningCLI):
